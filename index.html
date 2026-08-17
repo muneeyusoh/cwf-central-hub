@@ -17,7 +17,7 @@
   
   <style>
     :root { 
-      --fintech-primary: #1E3A8A; /* เน้นสีระดับชาติ น้ำเงินเข้ม */
+      --fintech-primary: #1E3A8A; 
       --fintech-accent: #2563EB; 
       --bg-light: #F8FAFC;
     }
@@ -94,7 +94,6 @@
         <small class="text-danger d-none mt-1" id="noMouAlert" style="font-size: 0.75rem;"><i class="fa-solid fa-circle-exclamation"></i> พื้นที่นี้ยังไม่มีระบบกองทุนสวัสดิการรองรับ</small>
       </div>
       
-      <!-- 🌟 เมื่อเลือกเทศบาลแล้ว ค่อยโหลดศูนย์ประสานงานของเทศบาลนั้นขึ้นมาให้เลือกอีกที -->
       <div class="mb-4" id="localCenterBox" style="display: none;">
         <label class="small text-muted fw-bold ms-1 mb-1">2. เลือกศูนย์ประสานงานใกล้บ้านท่าน</label>
         <select class="form-select text-dark" id="localCenterSelect" name="center" required>
@@ -124,21 +123,14 @@
   // ⚠️ 2. ใส่ URL ของ API Web App ระบบกลาง (Master Hub) ตรงนี้
   const CENTRAL_API_URL = "https://script.google.com/macros/s/AKfycbwG-iVeDmIPxFaqy1GRk9j0PtPljQSllQt2bqP7q8U3E2zbPGzojxvDCQuGYXpNmZQW/exec";
 
-  // ฐานข้อมูลสมมติจำลองศูนย์ประสานงานของแต่ละเทศบาล (ในอนาคตสามารถย้ายไปอยู่บนฐานข้อมูลกลางได้)
-  const LOCAL_CENTERS_MAP = {
-    "เทศบาลตำบลสุคิริน": ["ศูนย์ชุมชนปารีย์", "ศูนย์ชุมชนเกียร์", "ศูนย์ชุมชนราษฎร์สามัคคี", "ศูนย์ชุมชนกลันตัน", "ศูนย์ชุมชนมาโมง", "ศูนย์ชุมชนสุคิริน"],
-    "เทศบาลตำบลแว้ง": ["ศูนย์หมู่ 1 แว้ง", "ศูนย์หมู่ 2 แว้ง", "ศูนย์ตลาดแว้ง"]
-  };
+  // 🌟 จุดเปลี่ยน: ตัวแปรเก็บข้อมูลศูนย์จากหลังบ้านแบบ Dynamic
+  let dynamicCentersMap = {}; 
 
   document.addEventListener("DOMContentLoaded", async () => {
     try {
-      // 1. ขอพิกัด GPS ก่อนเลย
       requestLocation();
-      
-      // 2. ดึงรายชื่อเทศบาลที่มี MOU จากระบบกลาง
       await loadAvailableNetworks();
 
-      // 3. เริ่มต้น LIFF
       await liff.init({ liffId: CENTRAL_LIFF_ID });
       if (liff.isLoggedIn()) {
         const profile = await liff.getProfile();
@@ -174,9 +166,12 @@
       
       const select = document.getElementById('mouNetworkSelect');
       
-      if(res.status === 'success' && res.data.length > 0) {
+      // ✅ จุดที่แก้ไข: เช็คข้อมูลในรูปแบบ Object แทน Array
+      if(res.status === 'success' && Object.keys(res.data).length > 0) {
+        dynamicCentersMap = res.data; // เก็บข้อมูลจับคู่พื้นที่ไว้ในตัวแปร
+        
         select.innerHTML = '<option value="" disabled selected>-- เลือกเทศบาล/ตำบล --</option>';
-        res.data.forEach(networkName => {
+        Object.keys(dynamicCentersMap).forEach(networkName => {
           const option = document.createElement('option');
           option.value = networkName;
           option.text = networkName;
@@ -197,8 +192,8 @@
     const selectedNetwork = document.getElementById('mouNetworkSelect').value;
     const centerSelect = document.getElementById('localCenterSelect');
     
-    // ค้นหาใน Map ว่าเทศบาลที่เลือกมีศูนย์อะไรบ้าง
-    const centers = LOCAL_CENTERS_MAP[selectedNetwork] || ["ศูนย์ประสานงานกลาง"];
+    // ✅ จุดที่แก้ไข: ดึงรายชื่อศูนย์จากตัวแปรที่รับมาจากหลังบ้าน
+    const centers = dynamicCentersMap[selectedNetwork] || ["ศูนย์ประสานงานกลาง"];
     
     centerSelect.innerHTML = '<option value="" disabled selected>-- โปรดเลือกศูนย์ประสานงาน --</option>';
     centers.forEach(cName => {
@@ -229,7 +224,6 @@
     }
 
     try {
-      // ⚡ ยิงข้อมูลไปหา "ระบบกลาง (API Gateway)"
       const res = await fetch(CENTRAL_API_URL, { 
         method: "POST", 
         body: JSON.stringify(payload) 
@@ -238,7 +232,7 @@
       if (res.status === 'success') {
         Swal.fire({
           title: 'ลงทะเบียนสำเร็จ!',
-          text: res.message, // "ส่งข้อมูลไปยังกองทุนสวัสดิการ เทศบาลตำบล... เรียบร้อยแล้ว"
+          text: res.message, 
           icon: 'success',
           confirmButtonColor: '#1E3A8A'
         }).then(() => liff.closeWindow()); 
